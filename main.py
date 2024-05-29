@@ -5,6 +5,7 @@ import shutil
 import json
 import requests
 
+
 studyPlansNames = {
     'LeetCode 75' : {
         'titleSlug': 'leetcode-75',
@@ -179,7 +180,7 @@ def getStudyplansFromUser(study_plans_names, allowed_languages):
 
             language = str(input(f"Which programming language would you like to study '{usr_res}' in?\nValid Programming Languages ('C++', 'Java', 'Python', 'Python3', 'C', 'C#', 'JavaScript', 'TypeScript', 'PHP', 'Swift', 'Kotlin', 'Go', 'Ruby', 'Scala', 'Rust', 'Racket'): "))
             while (language not in list(allowed_languages.keys())):
-                str(input(f"Invalid Language. \nValid Programming Languages ('C++', 'Java', 'Python', 'Python3', 'C', 'C#', 'JavaScript', 'TypeScript', 'PHP', 'Swift', 'Kotlin', 'Go', 'Ruby', 'Scala', 'Rust', 'Racket'): "))
+                language = str(input(f"Invalid Language. \nValid Programming Languages ('C++', 'Java', 'Python', 'Python3', 'C', 'C#', 'JavaScript', 'TypeScript', 'PHP', 'Swift', 'Kotlin', 'Go', 'Ruby', 'Scala', 'Rust', 'Racket'): "))
 
             study_plans[usr_res] = language
             print(f"Succesfully Added: '{usr_res}' with language {language}.")
@@ -190,7 +191,7 @@ def getStudyplansFromUser(study_plans_names, allowed_languages):
     return study_plans
     
 
-def getProblemInfo(language, problem_slug, problem_url, allowed_languages):
+def getProblemInfo(curr_lang, problem_slug, problem_url, allowed_languages):
     data = {"operationName":"questionData","variables":{"titleSlug":f"{problem_slug}"},"query":"query questionData($titleSlug: String!) {\n  question(titleSlug: $titleSlug) {\n    questionId\n    questionFrontendId\n    boundTopicId\n    title\n    titleSlug\n    content\n    translatedTitle\n    translatedContent\n    isPaidOnly\n    difficulty\n    likes\n    dislikes\n    isLiked\n    similarQuestions\n    contributors {\n      username\n      profileUrl\n      avatarUrl\n      __typename\n    }\n    langToValidPlayground\n    topicTags {\n      name\n      slug\n      translatedName\n      __typename\n    }\n    companyTagStats\n    codeSnippets {\n      lang\n      langSlug\n      code\n      __typename\n    }\n    stats\n    hints\n    solution {\n      id\n      canSeeDetail\n      __typename\n    }\n    status\n    sampleTestCase\n    metaData\n    judgerAvailable\n    judgeType\n    mysqlSchemas\n    enableRunCode\n    enableTestMode\n    envInfo\n    libraryUrl\n    __typename\n  }\n}\n"}
 
     r = requests.post('https://leetcode.com/graphql', json = data).json()
@@ -204,30 +205,31 @@ def getProblemInfo(language, problem_slug, problem_url, allowed_languages):
 
     code_snippet = None # code snippet 
     for code_snip_dict in code_snippet_array:
-        if (code_snip_dict['lang'] == language):
+        if (code_snip_dict['lang'] == curr_lang):
             code_snippet = code_snip_dict['code'] # code snippet
 
     if (not code_snippet):
         alt_langs = [code_snip_dict['lang'] for code_snip_dict in code_snippet_array]
-        print(f"We could not generate the problem '{title}' with the language '{language}', please choose one of the following:")
+        print(f"We could not generate the problem '{title}' with the language '{curr_lang}', please choose one of the following:")
         print(alt_langs)
         choice = str(input("Which language would you like to use instead?: "))
         while (choice not in alt_langs):
             choice = input("Invalid Language, choose another one:")
-        language = choice
+        
+        curr_lang = choice
     
     for code_snip_dict in code_snippet_array:
-        if (code_snip_dict['lang'] == language):
+        if (code_snip_dict['lang'] == curr_lang):
             code_snippet = code_snip_dict['code'] # code snippet
 
     
     question = soup.get_text() # question
 
-    file_content = f"{allowed_languages[language]['ml_comm_start']}\n{problem_url}\n\n\n{title}\n\n{question}\n{allowed_languages[language]['ml_comm_end']}\n{code_snippet}"
+    file_content = f"{allowed_languages[curr_lang]['ml_comm_start']}\n{problem_url}\n\n\n{title}\n\n{question}\n{allowed_languages[curr_lang]['ml_comm_end']}\n{code_snippet}"
     
     return {
         'content' : file_content,
-        'extension' : allowedLanguages[language]['extension']
+        'extension' : allowedLanguages[curr_lang]['extension']
     }
     
 
@@ -276,8 +278,66 @@ def main():
             for question in subgroup['questions']:
                 problem_slug = question['titleSlug']
                 problem_url = formatProblemUrl(problem_slug)
+
+                #start 
+
+                data = {"operationName":"questionData","variables":{"titleSlug":f"{problem_slug}"},"query":"query questionData($titleSlug: String!) {\n  question(titleSlug: $titleSlug) {\n    questionId\n    questionFrontendId\n    boundTopicId\n    title\n    titleSlug\n    content\n    translatedTitle\n    translatedContent\n    isPaidOnly\n    difficulty\n    likes\n    dislikes\n    isLiked\n    similarQuestions\n    contributors {\n      username\n      profileUrl\n      avatarUrl\n      __typename\n    }\n    langToValidPlayground\n    topicTags {\n      name\n      slug\n      translatedName\n      __typename\n    }\n    companyTagStats\n    codeSnippets {\n      lang\n      langSlug\n      code\n      __typename\n    }\n    stats\n    hints\n    solution {\n      id\n      canSeeDetail\n      __typename\n    }\n    status\n    sampleTestCase\n    metaData\n    judgerAvailable\n    judgeType\n    mysqlSchemas\n    enableRunCode\n    enableTestMode\n    envInfo\n    libraryUrl\n    __typename\n  }\n}\n"}
+
+                r = requests.post('https://leetcode.com/graphql', json = data).json()
+                if (r['data']['question']['isPaidOnly']):
+                    return ""
+                soup = BeautifulSoup(r['data']['question']['content'], 'lxml')
+
+                title = r['data']['question']['title'] # title 
+
+                code_snippet_array = r['data']['question']['codeSnippets']
+
+                code_snippet = None # code snippet 
+                for code_snip_dict in code_snippet_array:
+                    if (code_snip_dict['lang'] == curr_lang):
+                        code_snippet = code_snip_dict['code'] # code snippet
+
+                file_content_raw = None
+                file_content = None
+                if (not code_snippet):
+                    alt_langs = [code_snip_dict['lang'] for code_snip_dict in code_snippet_array]
+                    print(f"We could not generate the problem '{title}' with the language '{curr_lang}', please choose one of the following:")
+                    print(alt_langs)
+                    choice = str(input("Which language would you like to use instead?: "))
+                    while (choice not in alt_langs):
+                        choice = input("Invalid Language, choose another one:")
+                    
+                    memorize_lang = input("Would you like to use this language for the rest of the study plan? (y/n): ").lower()
+                    while (not(memorize_lang == "y" or memorize_lang == "n")):
+                        memorize_lang = input("Invalid Input, memorize language? (y/n): ").lower()
+                    curr_lang = choice if memorize_lang == "y" else curr_lang
+
+                    temp_lang = choice
                 
-                file_content = getProblemInfo(curr_lang, problem_slug, problem_url, allowedLanguages)
+                    for code_snip_dict in code_snippet_array:
+                        if (code_snip_dict['lang'] == temp_lang):
+                            code_snippet = code_snip_dict['code'] # code snippet
+
+                    question = soup.get_text() # question
+                    file_content_raw = f"{allowedLanguages[temp_lang]['ml_comm_start']}\n{problem_url}\n\n\n{title}\n\n{question}\n{allowedLanguages[temp_lang]['ml_comm_end']}\n{code_snippet}"
+                    file_content = {
+                        'content' : file_content_raw,
+                        'extension' : allowedLanguages[temp_lang]['extension']
+                    }
+                else:
+                    question = soup.get_text() # question
+                    file_content_raw = f"{allowedLanguages[curr_lang]['ml_comm_start']}\n{problem_url}\n\n\n{title}\n\n{question}\n{allowedLanguages[curr_lang]['ml_comm_end']}\n{code_snippet}"
+                    file_content = {
+                        'content' : file_content_raw,
+                        'extension' : allowedLanguages[curr_lang]['extension']
+                    }
+
+
+                question = soup.get_text() # question
+
+
+                #end            
+
                 if (file_content != ""):
                     print(f"\t\tCreating {studyplan_slug}/{subgroup_dir_name}/{problem_slug}.{file_content['extension']}...")
                     with open(f"{problem_slug}.{file_content['extension']}", 'w') as file:

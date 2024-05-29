@@ -13,7 +13,7 @@ def delete_directories_in_cwd():
         item_path = os.path.join(cwd, item)
         
         # Check if the item is a directory
-        if os.path.isdir(item_path):
+        if os.path.isdir(item_path) and item != '.git':
             # Delete the directory and its contents
             shutil.rmtree(item_path)
 
