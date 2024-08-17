@@ -1,10 +1,11 @@
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from PySide6 import QtCore, QtWidgets, QtGui
+import sys
 import os
 import shutil
 import json
 import requests
-
 
 studyPlansNames = {
     'LeetCode 75' : {
@@ -163,6 +164,99 @@ allowedLanguages = {
     
 }
 
+class MyWidget(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+
+
+        self.studyPlans = {}
+
+
+        self.studyPlansLabel = QtWidgets.QLabel(self.formatPlans() if len(self.studyPlans) > 0 else "No study plans.")
+
+        self.studyPlansDropdownLabel = QtWidgets.QLabel("Supported study plans:")
+
+        self.studyPlansDropdown = QtWidgets.QComboBox()
+        self.studyPlansDropdown.addItems(studyPlansNames.keys())
+
+        self.addPlanButton = QtWidgets.QPushButton("Add Study Plan")
+        self.addPlanButton.clicked.connect(self.addPlan)
+
+        self.languagesLayout = QtWidgets.QVBoxLayout()
+
+        self.generateFilesButton = QtWidgets.QPushButton("Generate Files")
+        self.generateFilesButton.clicked.connect(self.generateFiles)
+
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.layout.addWidget(self.studyPlansLabel)
+        self.layout.addWidget(self.studyPlansDropdownLabel)
+        self.layout.addWidget(self.studyPlansDropdown)
+        self.layout.addWidget(self.addPlanButton)
+        self.layout.addLayout(self.languagesLayout)
+        self.layout.addWidget(self.generateFilesButton)
+
+        
+
+
+
+    @QtCore.Slot()
+    def addPlan(self):
+        newPlan = self.studyPlansDropdown.currentText()
+        if newPlan and newPlan not in self.studyPlans:
+            self.studyPlans[newPlan] = None
+            self.addLanguageSelector(newPlan)
+            self.studyPlansLabel.setText(self.formatPlans())
+
+    @QtCore.Slot()
+    def addLanguageSelector(self, plan):
+        # Create a dropdown for selecting language
+        languageLabel = QtWidgets.QLabel(f"Select language for {plan}:")
+        languageDropdown = QtWidgets.QComboBox()
+        
+        # Add all available languages
+        languageDropdown.addItems(allowedLanguages.keys())
+        
+        # Set a default language (e.g., English)
+        defaultLanguage = "Python"
+        index = languageDropdown.findText(defaultLanguage)
+        if index != -1:  # Check if the language is found in the dropdown
+            languageDropdown.setCurrentIndex(index)
+        else:
+            languageDropdown.setCurrentIndex(0)  # Fallback to the first item
+        
+        # Set the default selection in the languageSelections dictionary
+        self.studyPlans[plan] = languageDropdown.currentText()
+
+        # Update the selection when the user changes the dropdown value
+        languageDropdown.currentTextChanged.connect(lambda lang: self.updateLanguageSelection(plan, lang))
+
+        # Add the dropdown and label to the layout
+        self.languagesLayout.addWidget(languageLabel)
+        self.languagesLayout.addWidget(languageDropdown)
+
+    @QtCore.Slot()
+    def updateLanguageSelection(self, plan, lang):
+        self.studyPlans[plan] = lang
+
+    @QtCore.Slot()
+    def formatPlans(self):
+        savedString = "Saved Plans: "
+        for index, plan in enumerate(self.studyPlans):
+            if index == 0:
+                savedString += f"{plan}"
+            else:
+                savedString += f", {plan}"
+        return savedString
+
+
+    @QtCore.Slot()
+    def generateFiles(self):
+        generateFiles(self.studyPlans)
+
+
+
+
+
 def getStudyplansFromUser(study_plans_names, allowed_languages):
     print(
         """Welcome! \nPlease enter the LeetCode study plans you would like to work on!
@@ -242,8 +336,10 @@ def formatSubgroupName(raw_subgroup):
 def formatProblemUrl(problem_slug):
     return f"https://leetcode.com/problems/{problem_slug}/description/"
 
-def main():     
-    study_plans = getStudyplansFromUser(studyPlansNames, allowedLanguages)
+
+# def generateFiles(study_plans):
+def generateFiles(study_plans):
+    # study_plans = getStudyplansFromUser(studyPlansNames, allowedLanguages)
     dr = webdriver.Chrome() 
 
     parent_dir = os.getcwd()
@@ -353,6 +449,19 @@ def main():
         print("\n+-------------------------------------------------------------------------------------+\n")
 
     print("All Done! Happy Coding!\n")
+
+def main():     
+    
+    app = QtWidgets.QApplication([])
+
+    widget = MyWidget()
+    widget.resize(800, 600)
+    widget.show()
+
+    
+
+
+    sys.exit(app.exec())
     
 
 if __name__ == "__main__":
