@@ -7,30 +7,36 @@ import shutil
 import json
 import requests
 
-studyPlansNames = {
-    'LeetCode 75' : {
-        'titleSlug': 'leetcode-75',
+queryLanguages = {
+    'PostgreSQL' : {
+        'extension': 'sql',
+        'sl_comm_chars' : '--',
+        'ml_comm_start' : '/*',
+        'ml_comm_end' : '*/'
     },
-    'Top Interview 150' : {
-        'titleSlug': 'top-interview-150',
+    'Pandas' : {
+        'extension': 'py',
+        'sl_comm_chars' : '#',
+        'ml_comm_start' : '"""',
+        'ml_comm_end' : '"""'
     },
-    'Binary Search' : {
-        'titleSlug': 'binary-search',
+    'Oracle' : {
+        'extension': 'dbf',
+        'sl_comm_chars' : '--',
+        'ml_comm_start' : '/*',
+        'ml_comm_end' : '*/'
     },
-    'SQL 50' : {
-        'titleSlug': 'top-sql-50',
-    },
-    'Introduction to Pandas' : {
-        'titleSlug': 'introduction-to-pandas',
-    },
-    '30 Days of Pandas' : {
-        'titleSlug': '30-days-of-pandas',
-    },
-    '30 Days of JavaScript' : {
-        'titleSlug': '30-days-of-javascript',
-    },
-    'Top 100 Liked' : {
-        'titleSlug': 'top-100-liked',
+    'MS SQL Server' : {
+        'extension': 'mdf',
+        'sl_comm_chars' : '--',
+        'ml_comm_start' : '/*',
+        'ml_comm_end' : '*/'
+    }, 
+    'MySQL' : {
+        'extension': 'sql',
+        'sl_comm_chars' : '#',
+        'ml_comm_start' : '/*',
+        'ml_comm_end' : '*/'
     }
 }
 
@@ -164,13 +170,67 @@ allowedLanguages = {
     
 }
 
+studyPlansNames = {
+    'LeetCode 75' : {
+        'titleSlug': 'leetcode-75',
+        'allowedLanguages': allowedLanguages
+    },
+    'Top Interview 150' : {
+        'titleSlug': 'top-interview-150',
+        'allowedLanguages': allowedLanguages
+    },
+    'Binary Search' : {
+        'titleSlug': 'binary-search',
+        'allowedLanguages': allowedLanguages
+    },
+    'SQL 50' : {
+        'titleSlug': 'top-sql-50',
+        'allowedLanguages': queryLanguages
+    },
+    'Introduction to Pandas' : {
+        'titleSlug': 'introduction-to-pandas',
+        'allowedLanguages': {
+            'Pandas' : {
+                'extension': 'py',
+                'sl_comm_chars' : '#',
+                'ml_comm_start' : '"""',
+                'ml_comm_end' : '"""'
+            }
+        },
+    },
+    '30 Days of Pandas' : {
+        'titleSlug': '30-days-of-pandas',
+        'allowedLanguages': queryLanguages,
+    },
+    '30 Days of JavaScript' : {
+        'titleSlug': '30-days-of-javascript',
+        'allowedLanguages': {
+            'JavaScript' : {
+                'extension': 'js',
+                'sl_comm_chars' : '//',
+                'ml_comm_start' : '/*',
+                'ml_comm_end' : '*/'
+            },
+            'TypeScript' : {
+                'extension': 'ts',
+                'sl_comm_chars' : '//',
+                'ml_comm_start' : '/*',
+                'ml_comm_end' : '*/'
+            }
+        },
+    },
+    'Top 100 Liked' : {
+        'titleSlug': 'top-100-liked',
+        'allowedLanguages': allowedLanguages,
+    }
+}
+
+
 class MyWidget(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
 
-
         self.studyPlans = {}
-
 
         self.studyPlansLabel = QtWidgets.QLabel(self.formatPlans() if len(self.studyPlans) > 0 else "No study plans.")
 
@@ -195,10 +255,6 @@ class MyWidget(QtWidgets.QWidget):
         self.layout.addLayout(self.languagesLayout)
         self.layout.addWidget(self.generateFilesButton)
 
-        
-
-
-
     @QtCore.Slot()
     def addPlan(self):
         newPlan = self.studyPlansDropdown.currentText()
@@ -214,7 +270,7 @@ class MyWidget(QtWidgets.QWidget):
         languageDropdown = QtWidgets.QComboBox()
         
         # Add all available languages
-        languageDropdown.addItems(allowedLanguages.keys())
+        languageDropdown.addItems(studyPlansNames[plan]["allowedLanguages"].keys())
         
         # Set a default language (e.g., English)
         defaultLanguage = "Python"
@@ -253,10 +309,7 @@ class MyWidget(QtWidgets.QWidget):
     def generateFiles(self):
         generateFiles(self.studyPlans)
 
-
-
-
-
+# currently unused 
 def getStudyplansFromUser(study_plans_names, allowed_languages):
     print(
         """Welcome! \nPlease enter the LeetCode study plans you would like to work on!
@@ -339,7 +392,6 @@ def formatProblemUrl(problem_slug):
 
 # def generateFiles(study_plans):
 def generateFiles(study_plans):
-    # study_plans = getStudyplansFromUser(studyPlansNames, allowedLanguages)
     dr = webdriver.Chrome() 
 
     parent_dir = os.getcwd()
@@ -438,6 +490,8 @@ def generateFiles(study_plans):
                     print(f"\t\tCreating {studyplan_slug}/{subgroup_dir_name}/{problem_slug}.{file_content['extension']}...")
                     with open(f"{problem_slug}.{file_content['extension']}", 'w') as file:
                         file.write(file_content['content'])
+                else:
+                    print("something went wrong")
 
             child_dir = os.getcwd()
             os.chdir(f"{parent_dir}/{studyplan_slug}")
