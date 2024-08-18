@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from PySide6 import QtCore, QtWidgets, QtGui
+from PySide6 import QtCore, QtWidgets
 import sys
 import os
 import shutil
@@ -247,13 +247,21 @@ class MyWidget(QtWidgets.QWidget):
         self.generateFilesButton = QtWidgets.QPushButton("Generate Files")
         self.generateFilesButton.clicked.connect(self.generateFiles)
 
+        # self.progress_label = QtWidgets.QTextEdit(self)
+        # self.progress_label.setReadOnly(True)
+        # self.progress_label.setText("Generating files...\n")
+
         self.layout = QtWidgets.QVBoxLayout(self)
+        
+    @QtCore.Slot()
+    def initializeApp(self):
         self.layout.addWidget(self.studyPlansLabel)
         self.layout.addWidget(self.studyPlansDropdownLabel)
         self.layout.addWidget(self.studyPlansDropdown)
         self.layout.addWidget(self.addPlanButton)
         self.layout.addLayout(self.languagesLayout)
         self.layout.addWidget(self.generateFilesButton)
+
 
     @QtCore.Slot()
     def addPlan(self):
@@ -307,7 +315,37 @@ class MyWidget(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def generateFiles(self):
-        generateFiles(self.studyPlans)
+        self.clear_layout(self.layout)
+        # while self.layout.count():
+        #     child = self.layout.takeAt(0)
+        #     if child.widget():
+        #         child.widget().deleteLater()
+
+        self.progress_label = QtWidgets.QTextEdit(self)
+        self.progress_label.setReadOnly(True)
+        self.progress_label.setText("Generating files...\n")
+
+        self.layout.addWidget(self.progress_label)
+
+        generateFiles(self, self.studyPlans)
+
+
+        
+
+    @QtCore.Slot()
+    def updateProgress(self, message):
+        current_text = self.progress_label.toPlainText()
+        self.progress_label.setText(current_text + message + "\n")
+
+    @QtCore.Slot()
+    def clear_layout(self, layout):
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+            elif child.layout():
+                self.clear_layout(child.layout())
+                child.layout().deleteLater()
 
 # currently unused 
 def getStudyplansFromUser(study_plans_names, allowed_languages):
@@ -391,7 +429,8 @@ def formatProblemUrl(problem_slug):
 
 
 # def generateFiles(study_plans):
-def generateFiles(study_plans):
+def generateFiles(gui, study_plans):
+    
     dr = webdriver.Chrome() 
 
     parent_dir = os.getcwd()
@@ -404,6 +443,8 @@ def generateFiles(study_plans):
         soup = BeautifulSoup(dr.page_source, "lxml")
         unfiltered_problems = soup.find('script', id="__NEXT_DATA__").text
 
+        
+
 
         # inner page (where the problems are) as json
         page_json = json.loads(unfiltered_problems)
@@ -411,16 +452,21 @@ def generateFiles(study_plans):
         # subgroups list (holds problems in dictionaries )
         subgroups_list = page_json['props']['pageProps']['dehydratedState']['queries'][0]['state']['data']["studyPlanV2Detail"]["planSubGroups"]
 
+        try:
+            os.mkdir(studyplan_slug)
+        except FileExistsError:
+            # print(f"A directory with the name '{studyplan_slug}' already exists. Going to the next study plan.")
+            gui.updateProgress(f"A directory with the name '{studyplan_slug}' already exists. Going to the next study plan.")
+            continue
 
 
-        os.mkdir(studyplan_slug)
-        print(f"Creating {studyplan_slug}/...")
+        gui.updateProgress(f"Creating {studyplan_slug}/...")
         os.chdir(f"{parent_dir}/{studyplan_slug}")
 
         for subgroup in subgroups_list:
             subgroup_dir_name = formatSubgroupName(subgroup['name']) 
             os.mkdir(subgroup_dir_name)
-            print(f"\tCreating {studyplan_slug}/{subgroup_dir_name}/...")
+            gui.updateProgress(f"\tCreating {studyplan_slug}/{subgroup_dir_name}/...")
             os.chdir(f"{parent_dir}/{studyplan_slug}/{subgroup_dir_name}")
 
             for question in subgroup['questions']:
@@ -429,11 +475,16 @@ def generateFiles(study_plans):
 
                 #start 
 
+                # if (problem_url == "https://leetcode.com/problems/the-number-of-rich-customers/description/"):
+                #     pass
+
                 data = {"operationName":"questionData","variables":{"titleSlug":f"{problem_slug}"},"query":"query questionData($titleSlug: String!) {\n  question(titleSlug: $titleSlug) {\n    questionId\n    questionFrontendId\n    boundTopicId\n    title\n    titleSlug\n    content\n    translatedTitle\n    translatedContent\n    isPaidOnly\n    difficulty\n    likes\n    dislikes\n    isLiked\n    similarQuestions\n    contributors {\n      username\n      profileUrl\n      avatarUrl\n      __typename\n    }\n    langToValidPlayground\n    topicTags {\n      name\n      slug\n      translatedName\n      __typename\n    }\n    companyTagStats\n    codeSnippets {\n      lang\n      langSlug\n      code\n      __typename\n    }\n    stats\n    hints\n    solution {\n      id\n      canSeeDetail\n      __typename\n    }\n    status\n    sampleTestCase\n    metaData\n    judgerAvailable\n    judgeType\n    mysqlSchemas\n    enableRunCode\n    enableTestMode\n    envInfo\n    libraryUrl\n    __typename\n  }\n}\n"}
 
                 r = requests.post('https://leetcode.com/graphql', json = data).json()
                 if (r['data']['question']['isPaidOnly']):
-                    return ""
+                    gui.updateProgress(f'Failed to fetch data from \'{problem_url}\', you must pay for this problem.')
+                    continue
+                    
                 soup = BeautifulSoup(r['data']['question']['content'], 'lxml')
 
                 title = r['data']['question']['title'] # title 
@@ -449,8 +500,8 @@ def generateFiles(study_plans):
                 file_content = None
                 if (not code_snippet):
                     alt_langs = [code_snip_dict['lang'] for code_snip_dict in code_snippet_array]
-                    print(f"We could not generate the problem '{title}' with the language '{curr_lang}', please choose one of the following:")
-                    print(alt_langs)
+                    gui.updateProgress(f"We could not generate the problem '{title}' with the language '{curr_lang}', please choose one of the following:")
+                    gui.updateProgress(alt_langs)
                     choice = str(input("Which language would you like to use instead?: "))
                     while (choice not in alt_langs):
                         choice = input("Invalid Language, choose another one:")
@@ -487,11 +538,11 @@ def generateFiles(study_plans):
                 #end            
 
                 if (file_content != ""):
-                    print(f"\t\tCreating {studyplan_slug}/{subgroup_dir_name}/{problem_slug}.{file_content['extension']}...")
+                    gui.updateProgress(f"\t\tCreating {studyplan_slug}/{subgroup_dir_name}/{problem_slug}.{file_content['extension']}...")
                     with open(f"{problem_slug}.{file_content['extension']}", 'w') as file:
                         file.write(file_content['content'])
                 else:
-                    print("something went wrong")
+                    gui.updateProgress("something went wrong")
 
             child_dir = os.getcwd()
             os.chdir(f"{parent_dir}/{studyplan_slug}")
@@ -500,20 +551,18 @@ def generateFiles(study_plans):
                 shutil.rmtree(child_dir)
         
         os.chdir(parent_dir)
-        print("\n+-------------------------------------------------------------------------------------+\n")
+        gui.updateProgress("\n+" + ('-' * 190) + "+\n")
 
-    print("All Done! Happy Coding!\n")
+    gui.updateProgress("All Done! Happy Coding!\n")
 
 def main():     
     
     app = QtWidgets.QApplication([])
 
     widget = MyWidget()
-    widget.resize(800, 600)
+    widget.resize(800, 150)
     widget.show()
-
-    
-
+    widget.initializeApp()
 
     sys.exit(app.exec())
     
