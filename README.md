@@ -13,6 +13,6 @@ This project is a Python script that asks users which LeetCode study plans they 
 ### Video Demo
 [Video](https://commonmark.org/help/)
 
-## Porfolio Properties
+## Portfolio Properties
 - showOnPortfolio = true
 - path = media/
