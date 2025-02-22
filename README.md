@@ -8,8 +8,3 @@ This project is a Python script that asks users which LeetCode study plans they 
 ![Alt text](./media/gui-interface.png)
 ![Alt text](./media/gui-result.png)
 ![Alt text](./media/new-plans.png)
-
-
-## Portfolio Properties
-- showOnPortfolio = true
-- path = media/
